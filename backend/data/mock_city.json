@@ -1,0 +1,26 @@
+{
+    "nodes": [
+        {
+            "id": "Power_A",
+            "type": "energy"
+        },
+        {
+            "id": "Water_Pump_1",
+            "type": "water"
+        },
+        {
+            "id": "Hospital_Main",
+            "type": "emergency"
+        }
+    ],
+    "edges": [
+        {
+            "source": "Power_A",
+            "target": "Water_Pump_1"
+        },
+        {
+            "source": "Water_Pump_1",
+            "target": "Hospital_Main"
+        }
+    ]
+}

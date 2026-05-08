@@ -1,21 +1,38 @@
-import json
 import networkx as nx
 
-def simulate_cascade(start_node):
-    try:
-        with open("data/mock_city.json", "r") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        return ["Error: Run generator.py first!"]
+# These are the exact mathematical weights P2 just discovered!
+DEPENDENCY_WEIGHTS = {
+    "Transport": 0.96,
+    "Water": 0.70,
+    "Comms": 0.16,
+    "Environment": 0.13,
+    "Emergency": -0.06
+}
 
-    # Build the city graph
+def simulate_cascade(start_node, threshold=0.5):
+    """
+    Simulates a failure spreading through the city.
+    If the dependency weight is greater than the threshold (0.5), it breaks.
+    """
+    # 1. Build the AI-driven City Graph
     G = nx.DiGraph()
-    for edge in data["edges"]:
-        G.add_edge(edge["source"], edge["target"])
-
-    # Run BFS to find all downstream nodes affected by the failure
-    if start_node not in G:
-        return [f"Node {start_node} not found"]
     
-    affected_nodes = list(nx.bfs_tree(G, start_node).nodes())
-    return affected_nodes
+    # We map the energy failure to all other domains
+    for target_domain, weight in DEPENDENCY_WEIGHTS.items():
+        G.add_edge("Energy", target_domain, weight=weight)
+
+    # 2. Run the smart cascade
+    if start_node not in G:
+        return [f"Error: {start_node} not in graph. Try 'Energy'."]
+
+    failed_nodes = [start_node]
+    
+    # Check all systems that depend on the failed node
+    for neighbor in G.neighbors(start_node):
+        dependency_strength = G[start_node][neighbor]['weight']
+        
+        # If the math says it's a strong dependency, it fails!
+        if dependency_strength >= threshold:
+            failed_nodes.append(neighbor)
+
+    return failed_nodes

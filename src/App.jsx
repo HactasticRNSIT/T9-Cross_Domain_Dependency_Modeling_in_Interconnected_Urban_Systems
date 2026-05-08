@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { runSimulation } from './api'; 
 import DependencyGraph from './components/DependencyGraph';
 import TicketSystem from './components/TicketSystem';
-import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
+import { db, auth, handleFirestoreError, OperationType, logout } from './lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { Activity, Database, MapPin, Zap, Info, ShieldAlert, ArrowRight, Clock, Shield } from 'lucide-react';
+import { Activity, Database, MapPin, Zap, Info, ShieldAlert, ArrowRight, Clock, Shield, LogOut } from 'lucide-react';
 
 export default function App() {
   const [target, setTarget] = useState('Energy');
@@ -71,6 +71,15 @@ export default function App() {
     addLog('TOPOLOGY_RESET: ALL_SYSTEMS_NOMINAL', 'info');
   };
 
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      addLog('IDENTITY_REVOKED: SESSION_CLOSED', 'warn');
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
   // Auth State Tracking
   useEffect(() => {
     return auth.onAuthStateChanged((u) => {
@@ -125,9 +134,26 @@ export default function App() {
             Cross-Domain Dependency <span className="text-cyan-500">Modeling</span>
           </h1>
         </div>
-        <div className="text-right hidden md:block">
-          <div className="text-[10px] font-mono text-slate-500 uppercase">Urban System Node:</div>
-          <div className="text-xl font-light text-slate-300">METRO-DISTRICT_B4</div>
+        <div className="flex flex-col items-end gap-3">
+          {user && (
+            <div className="flex items-center gap-4 bg-slate-900/50 border border-slate-800 p-2 rounded-lg">
+              <div className="flex flex-col text-right">
+                <span className="text-[8px] font-mono text-slate-500 uppercase">Authorized Entity</span>
+                <span className="text-[10px] text-cyan-400 font-mono truncate max-w-[150px]">{user.email}</span>
+              </div>
+              <button 
+                onClick={handleSignOut}
+                className="p-1.5 hover:bg-slate-800 rounded text-slate-500 hover:text-pink-500 transition-all border border-transparent hover:border-slate-700"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          <div className="text-right hidden md:block">
+            <div className="text-[10px] font-mono text-slate-500 uppercase">Urban System Node:</div>
+            <div className="text-xl font-light text-slate-300">METRO-DISTRICT_B4</div>
+          </div>
         </div>
       </header>
 
@@ -240,15 +266,15 @@ export default function App() {
                   )}
 
                   {cascadeTimeline.length > 0 && (
-                     <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-4 mt-6">
-                       <h3 className="text-[11px] font-mono uppercase text-cyan-400 mb-4 flex items-center gap-2">
+                     <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-lg p-4 mt-6 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
+                       <h3 className="text-[11px] font-mono uppercase text-indigo-400 mb-4 flex items-center gap-2">
                          <ShieldAlert className="w-3 h-3" />
                          Simulated Cascade Alerts
                        </h3>
                      <div className="space-y-4">
                        {cascadeTimeline.map((evt, idx) => (
                          <div key={idx} className="relative pl-6 border-l border-slate-800 pb-2 last:pb-0">
-                           <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.8)]"></div>
+                           <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>
                            <div className="flex justify-between items-start mb-1 text-[10px] font-mono">
                              <span className="text-white font-bold">{evt.node.toUpperCase()}</span>
                              <span className="text-slate-500">+{evt.timeDelay.toFixed(1)}s</span>
@@ -313,22 +339,22 @@ export default function App() {
         <div className="col-span-1 md:col-span-3 flex flex-col h-full overflow-hidden space-y-4">
           
           {/* Tab Selection */}
-          <div className="flex bg-slate-900/50 p-1 rounded-lg border border-slate-800">
+        <div className="flex bg-[#0a0c1a] p-1 rounded-lg border border-slate-800 shadow-inner">
             <button 
               onClick={() => setActiveRightTab('analysis')}
-              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'analysis' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'analysis' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'text-slate-500 hover:text-slate-300'}`}
             >
               Analysis
             </button>
             <button 
               onClick={() => setActiveRightTab('tickets')}
-              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'tickets' ? 'bg-cyan-600 text-black font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'tickets' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-500 hover:text-slate-300'}`}
             >
               Tickets
             </button>
             <button 
               onClick={() => setActiveRightTab('logs')}
-              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'logs' ? 'bg-cyan-600 text-black font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'logs' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-500 hover:text-slate-300'}`}
             >
               Stream
             </button>
@@ -413,15 +439,18 @@ export default function App() {
 
             {activeRightTab === 'logs' && (
               <div className="flex flex-col h-full overflow-hidden">
-                <div className="text-slate-500 mb-4 uppercase tracking-[0.1em] border-b border-slate-800 pb-2 flex items-center justify-between">
+                <div className="text-emerald-500/70 mb-4 uppercase tracking-[0.1em] border-b border-emerald-900/30 pb-2 flex items-center justify-between font-mono text-[9px]">
                   Event Feed Stream
-                  <ShieldAlert className="w-3 h-3 text-cyan-500 animate-pulse" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1 h-1 bg-emerald-500 rounded-full animate-ping"></span>
+                    <ShieldAlert className="w-3 h-3 text-emerald-500" />
+                  </div>
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
                   {logs.map((log, i) => (
-                    <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-pink-500' : log.type === 'warn' ? 'text-yellow-400' : 'text-cyan-400'}`}>
-                      <span className="opacity-50 min-w-[55px]">[{log.time}]</span> 
-                      <span className="break-all">{log.msg}</span>
+                    <div key={i} className={`flex gap-3 text-[10px] font-mono ${log.type === 'error' ? 'text-pink-500' : log.type === 'warn' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      <span className="opacity-40 min-w-[55px] border-r border-slate-800 pr-2">[{log.time}]</span> 
+                      <span className="break-all tracking-tight leading-relaxed">{log.msg}</span>
                     </div>
                   ))}
                   {logs.length === 0 && (

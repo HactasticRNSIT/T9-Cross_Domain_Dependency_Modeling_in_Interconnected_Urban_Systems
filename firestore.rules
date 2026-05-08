@@ -46,12 +46,10 @@ service cloud.firestore {
       allow list: if isVerified();
       allow get: if isVerified();
       allow create: if isVerified() && isValidTicket(incoming()) && isValidId(ticketId);
-      allow update: if isVerified() && (
-        // Only owner can resolve/close
-        existing().createdBy == request.auth.uid && 
-        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
-        incoming().status in ['resolved', 'closed'] &&
-        incoming().updatedAt == request.time
+      allow update: if isVerified() && existing().createdBy == request.auth.uid && (
+        // Action: Generic Edit (title, description, severity, status)
+        (incoming().diff(existing()).affectedKeys().hasAny(['title', 'description', 'severity', 'status', 'updatedAt']) &&
+         incoming().updatedAt == request.time)
       );
     }
   }

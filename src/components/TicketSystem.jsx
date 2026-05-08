@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType, signInWithGoogle } from '../lib/firebase';
-import { AlertCircle, Plus, X, CheckCircle2, User, Clock } from 'lucide-react';
+import { AlertCircle, Plus, X, CheckCircle2, User, Clock, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function TicketSystem({ failedSystems, onAlert }) {
@@ -15,6 +15,7 @@ export default function TicketSystem({ failedSystems, onAlert }) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [user, setUser] = useState(null);
+  const [editingTicket, setEditingTicket] = useState(null);
 
   useEffect(() => {
     return auth.onAuthStateChanged((u) => setUser(u));
@@ -41,25 +42,49 @@ export default function TicketSystem({ failedSystems, onAlert }) {
     
     const path = 'tickets';
     try {
-      await addDoc(collection(db, path), {
-        ...formData,
-        status: 'open',
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        affectedDomains: failedSystems
-      });
-      setShowModal(false);
-      setFormData({ domain: 'Energy', title: '', description: '', severity: 'medium' });
-      const affectedMsg = failedSystems.length > 0 
-        ? ` CASCADE_ALERT sent to: ${failedSystems.join(' / ')}.`
-        : "";
-      onAlert(`TICKET_CREATED: ${formData.domain} domain alert broadcasted.${affectedMsg}`, 'warn');
+      if (editingTicket) {
+        await updateDoc(doc(db, path, editingTicket.id), {
+          ...formData,
+          updatedAt: serverTimestamp()
+        });
+        onAlert(`TICKET_UPDATED: Incident record #${editingTicket.id.slice(0,6)} modified.`, 'info');
+      } else {
+        await addDoc(collection(db, path), {
+          ...formData,
+          status: 'open',
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          affectedDomains: failedSystems
+        });
+        const affectedMsg = failedSystems.length > 0 
+          ? ` CASCADE_ALERT sent to: ${failedSystems.join(' / ')}.`
+          : "";
+        onAlert(`TICKET_CREATED: ${formData.domain} domain alert broadcasted.${affectedMsg}`, 'warn');
+      }
+      handleCloseModal();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+      handleFirestoreError(error, editingTicket ? OperationType.UPDATE : OperationType.CREATE, editingTicket ? `${path}/${editingTicket.id}` : path);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleEdit = (ticket) => {
+    setEditingTicket(ticket);
+    setFormData({
+      domain: ticket.domain,
+      title: ticket.title,
+      description: ticket.description || '',
+      severity: ticket.severity
+    });
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingTicket(null);
+    setFormData({ domain: 'Energy', title: '', description: '', severity: 'medium' });
   };
 
   if (!user) {
@@ -110,7 +135,20 @@ export default function TicketSystem({ failedSystems, onAlert }) {
                 }`}>
                   {ticket.severity}
                 </span>
-                <span className="text-slate-500 font-mono tracking-tighter">#{ticket.id.slice(0,6)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-mono tracking-tighter">#{ticket.id.slice(0,6)}</span>
+                  {ticket.createdBy === user?.uid && (
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => handleEdit(ticket)}
+                        className="text-slate-600 hover:text-cyan-400 transition-colors p-0.5"
+                        title="Edit Ticket"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="text-white font-bold uppercase truncate">{ticket.title}</div>
               <div className="flex items-center gap-2 text-slate-400">
@@ -156,8 +194,10 @@ export default function TicketSystem({ failedSystems, onAlert }) {
               className="bg-[#0a0c14] border border-slate-800 w-full max-w-md rounded-xl p-8 space-y-6"
             >
               <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-                <h2 className="text-xl font-bold text-white tracking-tight uppercase">Raise Domain Alert</h2>
-                <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-white transition-colors">
+                <h2 className="text-xl font-bold text-white tracking-tight uppercase">
+                  {editingTicket ? 'Modify Domain Alert' : 'Raise Domain Alert'}
+                </h2>
+                <button onClick={handleCloseModal} className="text-slate-500 hover:text-white transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -223,7 +263,7 @@ export default function TicketSystem({ failedSystems, onAlert }) {
                   ) : (
                     <CheckCircle2 className="w-4 h-4" />
                   )}
-                  {isSubmitting ? 'Transmitting...' : 'Broadcast Alert'}
+                  {isSubmitting ? 'Transmitting...' : (editingTicket ? 'Update Record' : 'Broadcast Alert')}
                 </button>
               </form>
             </motion.div>

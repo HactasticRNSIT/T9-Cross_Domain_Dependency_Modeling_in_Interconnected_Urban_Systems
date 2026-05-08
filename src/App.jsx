@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { runSimulation } from './api'; 
 import DependencyGraph from './components/DependencyGraph';
 import TicketSystem from './components/TicketSystem';
+import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { Activity, Database, MapPin, Zap, Info, ShieldAlert, ArrowRight, Clock, Shield } from 'lucide-react';
 
 export default function App() {
@@ -9,6 +11,16 @@ export default function App() {
   const [failedSystems, setFailedSystems] = useState([]);
   const [cascadeTimeline, setCascadeTimeline] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [user, setUser] = useState(null);
+  const [fluctuations, setFluctuations] = useState({
+    Energy: 50,
+    Transport: 50,
+    Water: 50,
+    Comms: 50,
+    Emergency: 50,
+    Environment: 50
+  });
+  const [activeTickets, setActiveTickets] = useState([]);
   const [logs, setLogs] = useState([
     { time: '10:42:01', msg: 'SYSTEM_BOOT: KERNEL_INIT_OK', type: 'info' },
     { time: '10:42:05', msg: 'DATABASE_LINK: ESTABLISHED', type: 'info' },
@@ -48,8 +60,58 @@ export default function App() {
   const handleReset = () => {
     setFailedSystems([]);
     setCascadeTimeline([]);
+    setFluctuations({
+      Energy: 50,
+      Transport: 50,
+      Water: 50,
+      Comms: 50,
+      Emergency: 50,
+      Environment: 50
+    });
     addLog('TOPOLOGY_RESET: ALL_SYSTEMS_NOMINAL', 'info');
   };
+
+  // Auth State Tracking
+  useEffect(() => {
+    return auth.onAuthStateChanged((u) => {
+      setUser(u);
+      if (u) {
+        addLog(`IDENTITY_VERIFIED: ${u.email}`, 'info');
+      }
+    });
+  }, []);
+
+  // Firebase listener for Informed Alerts
+  useEffect(() => {
+    if (!user) {
+      setActiveTickets([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'tickets'), 
+      where('domain', '==', target),
+      where('status', '==', 'open')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setActiveTickets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'tickets');
+    });
+
+    return () => unsubscribe();
+  }, [target, user]);
+
+  // Derived metrics based on current target and fluctuations
+  const currentFluctuation = fluctuations[target] || 50;
+  const deviation = Math.abs(currentFluctuation - 50);
+
+  const integrityValue = failedSystems.includes(target) 
+    ? '00.0' 
+    : Math.max(0, 98.4 - (deviation * 1.5)).toFixed(1);
+  
+  const criticalityValue = (Math.min(100, (deviation * 2) + (failedSystems.length * 15))).toFixed(1);
 
   return (
     <div className="w-full h-screen bg-[#05060a] text-slate-300 font-sans flex flex-col p-6 lg:p-10 select-none relative">
@@ -58,7 +120,7 @@ export default function App() {
       {/* Header Section */}
       <header className="flex justify-between items-end border-b border-slate-800 pb-6 mb-8">
         <div className="flex flex-col">
-          <span className="text-[10px] font-mono tracking-[0.3em] text-cyan-400 uppercase mb-2">Project T6-RNSIT</span>
+          <span className="text-[10px] font-mono tracking-[0.3em] text-cyan-400 uppercase mb-2">Project T1-RNSIT</span>
           <h1 className="text-4xl font-bold text-white tracking-tighter uppercase leading-none">
             Cross-Domain Dependency <span className="text-cyan-500">Modeling</span>
           </h1>
@@ -78,11 +140,11 @@ export default function App() {
           <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
             <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-4 flex items-center gap-2">
               <Activity className="w-3 h-3 text-cyan-400" />
-              Simulation Controls
+              Sector Intelligence
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-mono text-slate-500 uppercase mb-2 block">Origin Node</label>
+                <label className="text-[10px] font-mono text-slate-500 uppercase mb-2 block tracking-widest">Active Sector Node</label>
                 <select 
                   className="w-full bg-[#0a0c14] border border-slate-800 p-2 text-xs text-white rounded outline-none focus:border-cyan-500 transition-colors"
                   value={target}
@@ -96,45 +158,93 @@ export default function App() {
                   <option value="Environment">Environment Systems</option>
                 </select>
               </div>
-              <div className="pt-2">
-                <div className="border-l-2 border-cyan-500 pl-4 mb-6">
-                  <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-2">System Integrity</h3>
-                  <div className="flex items-center gap-4 mb-1">
-                    <span className="text-2xl font-bold text-white">
-                      {failedSystems.length > 0 ? Math.max(0, 100 - (failedSystems.length * 18.5)).toFixed(1) : "98.4"}%
+
+                <div className="space-y-4 pt-4 border-t border-slate-800/50">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[9px] font-mono text-cyan-400 uppercase tracking-tighter">
+                      {target === 'Energy' ? 'Grid Load Variance' : 
+                       target === 'Transport' ? 'Traffic Flow Volume' :
+                       target === 'Water' ? 'Pump Pressure Delta' :
+                       target === 'Comms' ? 'Signal Noise Ratio' :
+                       target === 'Emergency' ? 'Unit Response Load' : 'Bio-Feedback Shift'}
+                    </label>
+                    <span className={`text-[9px] font-mono ${deviation > 25 ? 'text-pink-500 animate-pulse' : 'text-slate-500'}`}>
+                      {currentFluctuation > 50 ? '+' : ''}{currentFluctuation - 50}%
                     </span>
-                    <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-cyan-400 transition-all duration-700" 
-                        style={{ width: `${failedSystems.length > 0 ? Math.max(0, 100 - (failedSystems.length * 18.5)) : 98.4}%` }}
-                      ></div>
-                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500 uppercase">Real-time telemetrics active</p>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="100" 
+                    value={currentFluctuation}
+                    onChange={(e) => setFluctuations({...fluctuations, [target]: parseInt(e.target.value)})}
+                    className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  />
+                  <div className="flex justify-between text-[7px] font-mono text-slate-600 uppercase">
+                    <span>{target === 'Energy' ? 'Deficit' : target === 'Transport' ? 'Sparse' : 'Min'}</span>
+                    <span>Nominal</span>
+                    <span>{target === 'Energy' ? 'Overload' : target === 'Transport' ? 'Gridlock' : 'Peak'}</span>
+                  </div>
                 </div>
 
-                <div className="border-l-2 border-pink-500 pl-4 mb-6">
-                  <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-2">Cascade Criticality</h3>
-                  <div className="flex items-center gap-4 mb-1">
-                    <span className="text-2xl font-bold border-b border-pink-500/30 text-white">
-                      {failedSystems.length > 0 ? (Math.pow(failedSystems.length, 1.5) * 12.5).toFixed(1) : "12.1"}%
-                    </span>
-                    <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-pink-500 transition-all duration-700" 
-                        style={{ width: `${failedSystems.length > 0 ? Math.min(100, Math.pow(failedSystems.length, 1.5) * 12.5) : 12.1}%` }}
-                      ></div>
+                <div className="pt-2">
+                  <div className="border-l-2 border-cyan-500 pl-4 mb-5">
+                    <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-2">Sector Integrity</h3>
+                    <div className="flex items-center gap-4 mb-1">
+                      <span className="text-2xl font-bold text-white tracking-tighter">
+                        {integrityValue}%
+                      </span>
+                      <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-cyan-400 transition-all duration-300" 
+                          style={{ width: `${integrityValue}%` }}
+                        ></div>
+                      </div>
                     </div>
+                    <p className="text-[10px] text-slate-500 uppercase">Localized Telemetry Active</p>
                   </div>
-                  <p className="text-[10px] text-slate-500 uppercase">Detection Sensitivity: High</p>
-                </div>
 
-                {cascadeTimeline.length > 0 && (
-                   <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-4 mt-6">
-                     <h3 className="text-[11px] font-mono uppercase text-cyan-400 mb-4 flex items-center gap-2">
-                       <ShieldAlert className="w-3 h-3" />
-                       Real-time Cascade Alerts
-                     </h3>
+                  <div className="border-l-2 border-pink-500 pl-4 mb-5">
+                    <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-2">Cascade Criticality</h3>
+                    <div className="flex items-center gap-4 mb-1">
+                      <span className={`text-2xl font-bold border-b border-pink-500/30 ${parseFloat(criticalityValue) > 60 ? 'text-pink-500' : 'text-white'}`}>
+                        {criticalityValue}%
+                      </span>
+                      <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-300 ${parseFloat(criticalityValue) > 60 ? 'bg-pink-500' : 'bg-slate-500'}`}
+                          style={{ width: `${criticalityValue}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 uppercase">Protocol Sensitivity: Optimized</p>
+                  </div>
+
+                  {activeTickets.length > 0 && (
+                    <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-3 mb-5">
+                      <h4 className="text-[10px] font-mono text-indigo-400 uppercase mb-2 flex items-center gap-2">
+                        < ShieldAlert className="w-3 h-3" />
+                        Informed Alerts
+                      </h4>
+                      <div className="space-y-2 max-h-[120px] overflow-y-auto pr-1">
+                        {activeTickets.map(ticket => (
+                          <div key={ticket.id} className="text-[10px] border-l border-indigo-500/50 pl-2 py-1">
+                            <span className="text-white block font-bold truncate tracking-tight">{ticket.title}</span>
+                            <span className="text-indigo-400/70 text-[8px] uppercase tracking-tighter font-mono">
+                              LVL: {ticket.severity} • CID_{ticket.id.slice(0,4)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {cascadeTimeline.length > 0 && (
+                     <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-4 mt-6">
+                       <h3 className="text-[11px] font-mono uppercase text-cyan-400 mb-4 flex items-center gap-2">
+                         <ShieldAlert className="w-3 h-3" />
+                         Simulated Cascade Alerts
+                       </h3>
                      <div className="space-y-4">
                        {cascadeTimeline.map((evt, idx) => (
                          <div key={idx} className="relative pl-6 border-l border-slate-800 pb-2 last:pb-0">

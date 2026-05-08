@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "Ticket": {
+      "title": "Incident Ticket",
+      "description": "A ticket raised by an admin for a domain failure or alert.",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "enum": ["Energy", "Transport", "Water", "Comms", "Emergency", "Environment"],
+          "description": "The domain this ticket is for."
+        },
+        "title": {
+          "type": "string",
+          "description": "Short summary of the incident."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed information about the alert."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "Impact level of the incident."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "resolved", "closed"],
+          "description": "Current state of the ticket."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of the user who created the ticket."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of last update."
+        },
+        "affectedDomains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Domains affected by the cascade at the time of creation."
+        }
+      },
+      "required": ["domain", "title", "severity", "status", "createdBy", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "tickets": {
+      "schema": "Ticket",
+      "description": "Collection of incident tickets."
+    }
+  }
+}

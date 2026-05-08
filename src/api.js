@@ -6,9 +6,9 @@ const BASE_URL = '';
 export const runSimulation = async (nodeId) => {
     try {
         const response = await axios.get(`${BASE_URL}/api/simulate/${nodeId}`);
-        return response.data.failed_nodes;
+        return response.data;
     } catch (error) {
         console.error("API Error - is Python running?", error);
-        return [];
+        return { nodes: [], timeline: [] };
     }
 };

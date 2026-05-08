@@ -1,0 +1,14 @@
+import axios from 'axios';
+
+// FastAPI runs on port 8000 by default
+const BASE_URL = 'http://localhost:8000';
+
+export const runSimulation = async (nodeId) => {
+    try {
+        const response = await axios.get(`${BASE_URL}/api/simulate/${nodeId}`);
+        return response.data.failed_nodes;
+    } catch (error) {
+        console.error("API Error - is Python running?", error);
+        return [];
+    }
+};

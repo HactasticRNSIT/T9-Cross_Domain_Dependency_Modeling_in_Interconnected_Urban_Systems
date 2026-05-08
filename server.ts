@@ -47,27 +47,47 @@ async function startServer() {
       ]
     };
 
+    const failedNodes = new Set([startNode]);
+    const timeline = [
+      { 
+        node: startNode, 
+        timeDelay: 0, 
+        cause: "DIRECT_TRIGGER", 
+        impact: 1.0 
+      }
+    ];
+
     if (!(startNode in graph)) {
-      return [startNode]; // Just the node itself fails if no known dependencies
+      return { nodes: [startNode], timeline };
     }
 
-    const failedNodes = new Set([startNode]);
     const neighbors = graph[startNode] || [];
+    let currentTime = 2.5; // Simulate milliseconds or seconds delay
 
     for (const neighbor of neighbors) {
       if (neighbor.weight >= threshold) {
         failedNodes.add(neighbor.target);
+        timeline.push({
+          node: neighbor.target,
+          timeDelay: currentTime,
+          cause: `DEPENDENCY_LINK_FROM_${startNode.toUpperCase()}`,
+          impact: neighbor.weight
+        });
+        currentTime += Math.random() * 5 + 2; // Incremental delay
       }
     }
 
-    return Array.from(failedNodes);
+    return { 
+      nodes: Array.from(failedNodes), 
+      timeline 
+    };
   }
 
   // API Routes
   app.get("/api/simulate/:node_id", (req, res) => {
     const nodeId = req.params.node_id;
-    const failedNodes = simulateCascade(nodeId);
-    res.json({ failed_nodes: failedNodes });
+    const result = simulateCascade(nodeId);
+    res.json(result);
   });
 
   // Vite middleware for development

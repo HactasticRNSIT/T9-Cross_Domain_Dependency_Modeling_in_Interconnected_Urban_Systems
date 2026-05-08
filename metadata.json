@@ -1,5 +1,5 @@
 {
-  "name": "Urban System Dependency Modeler",
+  "name": "T6-RNSIT Urban Dependency Modeler",
   "description": "Models and simulates cascading failures in interconnected urban systems using dependency weights.",
   "requestFramePermissions": [],
   "majorCapabilities": []

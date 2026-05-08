@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { runSimulation } from './api'; 
 import DependencyGraph from './components/DependencyGraph';
-import { Activity, Database, MapPin, Zap, Info } from 'lucide-react';
+import TicketSystem from './components/TicketSystem';
+import { Activity, Database, MapPin, Zap, Info, ShieldAlert, ArrowRight, Clock, Shield } from 'lucide-react';
 
 export default function App() {
   const [target, setTarget] = useState('Energy');
   const [failedSystems, setFailedSystems] = useState([]);
+  const [cascadeTimeline, setCascadeTimeline] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [logs, setLogs] = useState([
     { time: '10:42:01', msg: 'SYSTEM_BOOT: KERNEL_INIT_OK', type: 'info' },
     { time: '10:42:05', msg: 'DATABASE_LINK: ESTABLISHED', type: 'info' },
     { time: '10:42:10', msg: 'NETWORK_SCAN: ALL_NODES_STABLE', type: 'info' }
   ]);
+
+  const [activeRightTab, setActiveRightTab] = useState('analysis');
 
   const addLog = (msg, type = 'info') => {
     const time = new Date().toLocaleTimeString([], { hour12: false });
@@ -23,10 +27,12 @@ export default function App() {
     addLog(`INITIATING_CASCADE_ANALYSIS: TARGET=${target.toUpperCase()}`, 'warn');
     
     try {
-      const affected = await runSimulation(target); 
-      setFailedSystems(affected);
-      if (affected.length > 1) {
-        addLog(`CASCADE_DETECTED: ${affected.length} NODES_AFFECTED`, 'error');
+      const result = await runSimulation(target); 
+      setFailedSystems(result.nodes || []);
+      setCascadeTimeline(result.timeline || []);
+
+      if (result.nodes?.length > 1) {
+        addLog(`CASCADE_DETECTED: ${result.nodes.length} NODES_AFFECTED`, 'error');
       } else {
         addLog(`ANALYSIS_COMPLETE: LOCAL_FAILURE_ONLY`, 'info');
       }
@@ -41,6 +47,7 @@ export default function App() {
 
   const handleReset = () => {
     setFailedSystems([]);
+    setCascadeTimeline([]);
     addLog('TOPOLOGY_RESET: ALL_SYSTEMS_NOMINAL', 'info');
   };
 
@@ -51,7 +58,7 @@ export default function App() {
       {/* Header Section */}
       <header className="flex justify-between items-end border-b border-slate-800 pb-6 mb-8">
         <div className="flex flex-col">
-          <span className="text-[10px] font-mono tracking-[0.3em] text-cyan-400 uppercase mb-2">Project T9-CRNSIT</span>
+          <span className="text-[10px] font-mono tracking-[0.3em] text-cyan-400 uppercase mb-2">Project T6-RNSIT</span>
           <h1 className="text-4xl font-bold text-white tracking-tighter uppercase leading-none">
             Cross-Domain Dependency <span className="text-cyan-500">Modeling</span>
           </h1>
@@ -106,7 +113,7 @@ export default function App() {
                   <p className="text-[10px] text-slate-500 uppercase">Real-time telemetrics active</p>
                 </div>
 
-                <div className="border-l-2 border-pink-500 pl-4">
+                <div className="border-l-2 border-pink-500 pl-4 mb-6">
                   <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-2">Cascade Criticality</h3>
                   <div className="flex items-center gap-4 mb-1">
                     <span className="text-2xl font-bold border-b border-pink-500/30 text-white">
@@ -121,6 +128,30 @@ export default function App() {
                   </div>
                   <p className="text-[10px] text-slate-500 uppercase">Detection Sensitivity: High</p>
                 </div>
+
+                {cascadeTimeline.length > 0 && (
+                   <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-4 mt-6">
+                     <h3 className="text-[11px] font-mono uppercase text-cyan-400 mb-4 flex items-center gap-2">
+                       <ShieldAlert className="w-3 h-3" />
+                       Real-time Cascade Alerts
+                     </h3>
+                     <div className="space-y-4">
+                       {cascadeTimeline.map((evt, idx) => (
+                         <div key={idx} className="relative pl-6 border-l border-slate-800 pb-2 last:pb-0">
+                           <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.8)]"></div>
+                           <div className="flex justify-between items-start mb-1 text-[10px] font-mono">
+                             <span className="text-white font-bold">{evt.node.toUpperCase()}</span>
+                             <span className="text-slate-500">+{evt.timeDelay.toFixed(1)}s</span>
+                           </div>
+                           <div className="flex items-center gap-2 text-[9px] text-slate-500 uppercase italic">
+                             <ArrowRight className="w-2.5 h-2.5 text-pink-500" />
+                             {evt.cause.split('_').join(' ')}
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
               </div>
             </div>
           </div>
@@ -168,21 +199,130 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sidebar Right: System Logs */}
-        <div className="col-span-1 md:col-span-3 flex flex-col h-full overflow-hidden">
-          <div className="flex-1 border border-slate-800 bg-[#07080f]/50 rounded-lg p-5 font-mono text-[10px] leading-relaxed overflow-y-auto">
-            <div className="text-slate-500 mb-4 uppercase tracking-[0.1em] border-b border-slate-800 pb-2">Event Feed Stream</div>
-            <div className="space-y-3">
-              {logs.map((log, i) => (
-                <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-pink-500' : log.type === 'warn' ? 'text-yellow-400' : 'text-cyan-400'}`}>
-                  <span className="opacity-50 min-w-[55px]">[{log.time}]</span> 
-                  <span className="break-all">{log.msg}</span>
+        {/* Sidebar Right: Incident Management & Logs */}
+        <div className="col-span-1 md:col-span-3 flex flex-col h-full overflow-hidden space-y-4">
+          
+          {/* Tab Selection */}
+          <div className="flex bg-slate-900/50 p-1 rounded-lg border border-slate-800">
+            <button 
+              onClick={() => setActiveRightTab('analysis')}
+              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'analysis' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              Analysis
+            </button>
+            <button 
+              onClick={() => setActiveRightTab('tickets')}
+              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'tickets' ? 'bg-cyan-600 text-black font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              Tickets
+            </button>
+            <button 
+              onClick={() => setActiveRightTab('logs')}
+              className={`flex-1 py-1.5 text-[9px] font-mono uppercase tracking-wider rounded transition-all ${activeRightTab === 'logs' ? 'bg-cyan-600 text-black font-bold' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              Stream
+            </button>
+          </div>
+
+          <div className="flex-1 border border-slate-800 bg-[#07080f]/50 rounded-lg p-5 overflow-hidden flex flex-col relative">
+            {activeRightTab === 'analysis' && (
+              <div className="flex flex-col h-full overflow-hidden">
+                <h3 className="text-[11px] font-mono uppercase text-indigo-400 border-b border-slate-800 pb-2 mb-4 flex items-center gap-2">
+                  <Shield className="w-3 h-3" />
+                  Predictive Analysis
+                </h3>
+                
+                {failedSystems.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 grayscale opacity-40">
+                    <Database className="w-10 h-10 text-slate-700" />
+                    <p className="text-[10px] uppercase font-mono max-w-[150px]">No active incident data for predictive processing.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6 overflow-y-auto pr-1">
+                    <div className="space-y-4">
+                      <div className="bg-indigo-500/5 border border-indigo-500/20 rounded p-3">
+                        <h4 className="text-[9px] text-indigo-300 uppercase font-bold mb-3 flex items-center gap-2">
+                           <Clock className="w-2.5 h-2.5" />
+                           Recovery Projections
+                        </h4>
+                        <div className="space-y-3">
+                           <div>
+                             <div className="flex justify-between text-[11px] font-mono mb-1">
+                               <span className="text-slate-500 uppercase tracking-tighter">Mean Restoration</span>
+                               <span className="text-indigo-400">{(failedSystems.length * 3.8).toFixed(1)}h</span>
+                             </div>
+                             <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-500" style={{ width: '40%' }}></div>
+                             </div>
+                           </div>
+                           <div className="grid grid-cols-2 gap-2">
+                             <div className="bg-slate-900/60 border border-slate-800 p-2 rounded">
+                               <span className="block text-[8px] text-slate-500 uppercase mb-1">Optimistic</span>
+                               <span className="text-xs font-bold text-green-500">{(failedSystems.length * 1.2).toFixed(1)}h</span>
+                             </div>
+                             <div className="bg-slate-900/60 border border-slate-800 p-2 rounded">
+                               <span className="block text-[8px] text-slate-500 uppercase mb-1">Critical Load</span>
+                               <span className="text-xs font-bold text-pink-500">{(Math.pow(failedSystems.length, 2) * 5.2).toFixed(1)}h</span>
+                             </div>
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-mono text-cyan-400 uppercase flex items-center gap-2">
+                           <Info className="w-2.5 h-2.5" />
+                           Topological Impact Info
+                        </div>
+                        <p className="text-[11px] leading-[1.5] text-slate-400">
+                          {failedSystems.length <= 2 
+                           ? `Minimal systemic disruption. Automated failsafes are currently rerouting operational load across healthy sectors. Manual intervention low priority.`
+                           : `Severe sector instability. ${failedSystems.length} systems are reporting sync errors. Protocol 9 activation prioritized for critical sector preservation. Expect secondary cascades if not isolated within 120s.`}
+                        </p>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-800">
+                        <h4 className="text-[9px] text-slate-500 uppercase font-bold mb-2">Dominant Sequence</h4>
+                        <div className="space-y-1">
+                          {cascadeTimeline.map((node, i) => (
+                            <div key={i} className="flex items-center gap-2 text-[10px]">
+                              <span className="text-slate-600">[{i+1}]</span>
+                              <span className={i === 0 ? "text-pink-500 font-bold" : "text-slate-300"}>{node.node}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeRightTab === 'tickets' && (
+              <TicketSystem failedSystems={failedSystems} onAlert={addLog} />
+            )}
+
+            {activeRightTab === 'logs' && (
+              <div className="flex flex-col h-full overflow-hidden">
+                <div className="text-slate-500 mb-4 uppercase tracking-[0.1em] border-b border-slate-800 pb-2 flex items-center justify-between">
+                  Event Feed Stream
+                  <ShieldAlert className="w-3 h-3 text-cyan-500 animate-pulse" />
                 </div>
-              ))}
-            </div>
+                <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                  {logs.map((log, i) => (
+                    <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-pink-500' : log.type === 'warn' ? 'text-yellow-400' : 'text-cyan-400'}`}>
+                      <span className="opacity-50 min-w-[55px]">[{log.time}]</span> 
+                      <span className="break-all">{log.msg}</span>
+                    </div>
+                  ))}
+                  {logs.length === 0 && (
+                    <div className="h-full flex items-center justify-center text-slate-700 italic text-[10px]">No stream data active.</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           
-          <div className="mt-6 space-y-3">
+          <div className="space-y-3">
             <button 
               onClick={handleTrigger}
               disabled={isSimulating}

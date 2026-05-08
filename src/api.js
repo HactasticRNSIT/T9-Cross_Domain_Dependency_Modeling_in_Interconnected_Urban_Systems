@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// FastAPI runs on port 8000 by default
-const BASE_URL = 'http://localhost:8000';
+// FastAPI runs on port 8000 by default - but now we use same origin
+const BASE_URL = '';
 
 export const runSimulation = async (nodeId) => {
     try {

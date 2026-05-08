@@ -1,12 +1,34 @@
 import React, { useMemo } from 'react';
-import ReactFlow, { Background, Controls, MarkerType } from 'reactflow';
+import ReactFlow, { Background, MarkerType, ReactFlowProvider, useReactFlow } from 'reactflow';
+import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import 'reactflow/dist/style.css';
 
-export default function DependencyGraph({ target, failedSystems, onNodeClick }) {
-  // We define the 5 domains. If the backend says they failed, they turn red. Otherwise, green.
+function CustomControls() {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  const buttonClass = "p-2 bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50 transition-all rounded shadow-lg backdrop-blur-sm group";
+  const iconClass = "w-4 h-4";
+
+  return (
+    <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-50">
+      <button onClick={() => zoomIn()} className={buttonClass} title="Zoom In">
+        <ZoomIn className={iconClass} />
+      </button>
+      <button onClick={() => zoomOut()} className={buttonClass} title="Zoom Out">
+        <ZoomOut className={iconClass} />
+      </button>
+      <button onClick={() => fitView({ duration: 800 })} className={buttonClass} title="Fit View">
+        <Maximize className={iconClass} />
+      </button>
+    </div>
+  );
+}
+
+function GraphInner({ target, failedSystems, onNodeClick }) {
   const handleNodeClick = (event, node) => {
     if (onNodeClick) onNodeClick(node.id);
   };
+  
   const nodes = useMemo(() => [
     { 
       id: 'Energy', 
@@ -165,8 +187,16 @@ export default function DependencyGraph({ target, failedSystems, onNodeClick }) 
         fitView
       >
         <Background color="#334155" gap={20} size={1} />
-        <Controls showInteractive={false} className="bg-slate-800 border-slate-700 fill-white" />
+        <CustomControls />
       </ReactFlow>
     </div>
+  );
+}
+
+export default function DependencyGraph(props) {
+  return (
+    <ReactFlowProvider>
+      <GraphInner {...props} />
+    </ReactFlowProvider>
   );
 }

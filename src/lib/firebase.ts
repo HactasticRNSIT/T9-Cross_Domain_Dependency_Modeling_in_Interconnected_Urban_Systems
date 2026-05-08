@@ -13,9 +13,16 @@ export const signInWithGoogle = async () => {
     return await signInWithPopup(auth, googleProvider);
   } catch (error) {
     if (error instanceof Error) {
+      // Log full error for debugging in user's environment
+      console.error('Firebase Auth Error:', error.code, error.message);
+      
       if (error.message.includes('auth/cancelled-popup-request') || error.message.includes('auth/popup-closed-by-user')) {
         console.log('User cancelled authentication');
         return null;
+      }
+      
+      if (error.message.includes('auth/unauthorized-domain')) {
+        alert('Domain Unauthorized: Please add your current domain (e.g. localhost) to the "Authorized domains" list in Firebase Console > Authentication > Settings.');
       }
     }
     throw error;

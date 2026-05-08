@@ -1,0 +1,231 @@
+import React, { useState, useEffect } from 'react';
+import { runSimulation } from './api'; 
+import DependencyGraph from './components/DependencyGraph';
+import { Activity, Database, MapPin, Zap, Info } from 'lucide-react';
+
+export default function App() {
+  const [target, setTarget] = useState('Energy');
+  const [failedSystems, setFailedSystems] = useState([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [logs, setLogs] = useState([
+    { time: '10:42:01', msg: 'SYSTEM_BOOT: KERNEL_INIT_OK', type: 'info' },
+    { time: '10:42:05', msg: 'DATABASE_LINK: ESTABLISHED', type: 'info' },
+    { time: '10:42:10', msg: 'NETWORK_SCAN: ALL_NODES_STABLE', type: 'info' }
+  ]);
+
+  const addLog = (msg, type = 'info') => {
+    const time = new Date().toLocaleTimeString([], { hour12: false });
+    setLogs(prev => [{ time, msg, type }, ...prev].slice(0, 10));
+  };
+
+  const handleTrigger = async () => {
+    setIsSimulating(true);
+    addLog(`INITIATING_CASCADE_ANALYSIS: TARGET=${target.toUpperCase()}`, 'warn');
+    
+    try {
+      const affected = await runSimulation(target); 
+      setFailedSystems(affected);
+      if (affected.length > 1) {
+        addLog(`CASCADE_DETECTED: ${affected.length} NODES_AFFECTED`, 'error');
+      } else {
+        addLog(`ANALYSIS_COMPLETE: LOCAL_FAILURE_ONLY`, 'info');
+      }
+    } catch (error) {
+      console.error("Backend connection failed!", error);
+      setFailedSystems(["Error: Connection Failure"]);
+      addLog(`CRITICAL_ERROR: API_DISCONNECT`, 'error');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const handleReset = () => {
+    setFailedSystems([]);
+    addLog('TOPOLOGY_RESET: ALL_SYSTEMS_NOMINAL', 'info');
+  };
+
+  return (
+    <div className="w-full h-screen bg-[#05060a] text-slate-300 font-sans flex flex-col p-6 lg:p-10 select-none relative">
+      <div className="absolute top-2 right-2 text-[8px] text-slate-800 pointer-events-none">UI_ACTIVE_VERSION_02</div>
+      
+      {/* Header Section */}
+      <header className="flex justify-between items-end border-b border-slate-800 pb-6 mb-8">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-mono tracking-[0.3em] text-cyan-400 uppercase mb-2">Project T9-CRNSIT</span>
+          <h1 className="text-4xl font-bold text-white tracking-tighter uppercase leading-none">
+            Cross-Domain Dependency <span className="text-cyan-500">Modeling</span>
+          </h1>
+        </div>
+        <div className="text-right hidden md:block">
+          <div className="text-[10px] font-mono text-slate-500 uppercase">Urban System Node:</div>
+          <div className="text-xl font-light text-slate-300">METRO-DISTRICT_B4</div>
+        </div>
+      </header>
+
+      {/* Main Modeling Viewport */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-8 overflow-hidden">
+        
+        {/* Sidebar Left: Domain Metrics */}
+        <div className="col-span-1 md:col-span-3 space-y-6 overflow-y-auto">
+          
+          <div className="bg-slate-900/40 border border-slate-800 p-5 rounded-lg">
+            <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-4 flex items-center gap-2">
+              <Activity className="w-3 h-3 text-cyan-400" />
+              Simulation Controls
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-mono text-slate-500 uppercase mb-2 block">Origin Node</label>
+                <select 
+                  className="w-full bg-[#0a0c14] border border-slate-800 p-2 text-xs text-white rounded outline-none focus:border-cyan-500 transition-colors"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                >
+                  <option value="Energy">Energy Grid Pulse</option>
+                  <option value="Water">Water Infrastructure</option>
+                  <option value="Transport">Transport Arteries</option>
+                  <option value="Comms">Communication Nodes</option>
+                  <option value="Emergency">Emergency Response</option>
+                  <option value="Environment">Environment Systems</option>
+                </select>
+              </div>
+              <div className="pt-2">
+                <div className="border-l-2 border-cyan-500 pl-4 mb-6">
+                  <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-2">System Integrity</h3>
+                  <div className="flex items-center gap-4 mb-1">
+                    <span className="text-2xl font-bold text-white">
+                      {failedSystems.length > 0 ? Math.max(0, 100 - (failedSystems.length * 18.5)).toFixed(1) : "98.4"}%
+                    </span>
+                    <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-cyan-400 transition-all duration-700" 
+                        style={{ width: `${failedSystems.length > 0 ? Math.max(0, 100 - (failedSystems.length * 18.5)) : 98.4}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 uppercase">Real-time telemetrics active</p>
+                </div>
+
+                <div className="border-l-2 border-pink-500 pl-4">
+                  <h3 className="text-[11px] font-mono uppercase text-slate-500 mb-2">Cascade Criticality</h3>
+                  <div className="flex items-center gap-4 mb-1">
+                    <span className="text-2xl font-bold border-b border-pink-500/30 text-white">
+                      {failedSystems.length > 0 ? (Math.pow(failedSystems.length, 1.5) * 12.5).toFixed(1) : "12.1"}%
+                    </span>
+                    <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-pink-500 transition-all duration-700" 
+                        style={{ width: `${failedSystems.length > 0 ? Math.min(100, Math.pow(failedSystems.length, 1.5) * 12.5) : 12.1}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 uppercase">Detection Sensitivity: High</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-lg">
+            <h4 className="text-[10px] font-mono text-cyan-400 uppercase mb-3 flex items-center gap-2">
+              <Zap className="w-3 h-3" />
+              Active Dependencies
+            </h4>
+            <ul className="space-y-3 text-xs">
+              {['Transport', 'Water', 'Comms', 'Environment'].map((sys) => (
+                <li key={sys} className="flex justify-between items-center group">
+                  <span className="text-slate-400">{sys} Domain</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${failedSystems.includes(sys) ? 'bg-pink-500/20 text-pink-500 border border-pink-500/50' : 'bg-green-500/20 text-green-500 border border-green-500/50'}`}>
+                    {failedSystems.includes(sys) ? 'FAILED' : 'STABLE'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Center: Dependency Graph Representation */}
+        <div className="col-span-1 md:col-span-6 relative bg-slate-900/20 border border-slate-800 rounded-2xl flex flex-col items-center justify-center overflow-hidden">
+          {/* Grid Overlay */}
+          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #444 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
+          
+          <div className="w-full h-full relative z-10 flex flex-col">
+             <div className="absolute top-4 left-4 z-20 pointer-events-none">
+                <div className="text-[10px] font-mono text-cyan-400 mb-1 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-cyan-400 animate-pulse rounded-full"></div>
+                  INTERACTIVE_TOPOLOGY_STREAM
+                </div>
+             </div>
+             <div className="flex-1 w-full relative">
+                <DependencyGraph 
+                  target={target} 
+                  failedSystems={failedSystems} 
+                  onNodeClick={(nodeId) => {
+                    setTarget(nodeId);
+                    addLog(`NODE_SELECTED: ${nodeId.toUpperCase()}`, 'info');
+                  }} 
+                />
+             </div>
+          </div>
+        </div>
+
+        {/* Sidebar Right: System Logs */}
+        <div className="col-span-1 md:col-span-3 flex flex-col h-full overflow-hidden">
+          <div className="flex-1 border border-slate-800 bg-[#07080f]/50 rounded-lg p-5 font-mono text-[10px] leading-relaxed overflow-y-auto">
+            <div className="text-slate-500 mb-4 uppercase tracking-[0.1em] border-b border-slate-800 pb-2">Event Feed Stream</div>
+            <div className="space-y-3">
+              {logs.map((log, i) => (
+                <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-pink-500' : log.type === 'warn' ? 'text-yellow-400' : 'text-cyan-400'}`}>
+                  <span className="opacity-50 min-w-[55px]">[{log.time}]</span> 
+                  <span className="break-all">{log.msg}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="mt-6 space-y-3">
+            <button 
+              onClick={handleTrigger}
+              disabled={isSimulating}
+              className={`w-full group relative overflow-hidden font-bold py-4 text-xs uppercase tracking-[0.2em] transition-all rounded ${isSimulating ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-black'}`}
+            >
+              <div className="relative z-10 flex items-center justify-center gap-2">
+                {isSimulating ? <Activity className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                {isSimulating ? 'Processing...' : 'Initiate Cascade Analysis'}
+              </div>
+              {!isSimulating && <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>}
+            </button>
+
+            <button 
+              onClick={handleReset}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 font-mono py-2 text-[10px] uppercase tracking-widest transition-colors rounded border border-slate-700"
+            >
+              Reset Live Topology
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Bar */}
+      <footer className="mt-10 flex flex-col sm:flex-row justify-between items-center text-[10px] font-mono border-t border-slate-800 pt-6 text-slate-500 gap-4 sm:gap-0">
+        <div className="flex flex-wrap gap-4 sm:gap-8 justify-center">
+          <div className="flex items-center gap-2">
+            <Database className="w-3 h-3 text-green-500" />
+            <span className="text-green-500">DATABASE_LINK_ACTIVE</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Activity className="w-3 h-3" />
+            <span>LATENCY: 12ms</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <MapPin className="w-3 h-3" />
+            <span className="hidden lg:inline">COORDINATES: 40.7128° N, 74.0060° W</span>
+            <span className="lg:hidden">NYC_GRID_B4</span>
+          </div>
+        </div>
+        <div className="uppercase tracking-widest text-center sm:text-right">
+          Urban Systems Dependency Engine v2.0.4-Stable
+        </div>
+      </footer>
+    </div>
+  );
+}
